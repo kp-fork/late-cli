@@ -9,7 +9,12 @@
 **随时随地投入项目，即刻开始构建。** 只需不到 10 秒钟即可发送你的第一条指令。
 
 ```bash
+# Linux / macOS
 brew tap mlhher/late && brew install late
+
+# 通用备用方案 (Linux / macOS / Windows WSL)
+curl -sfL https://raw.githubusercontent.com/mlhher/late-cli/main/install.sh | bash
+
 cd your-project
 late
 ```

@@ -9,7 +9,12 @@
 **Drop into any project and start building.** Get to your first prompt in less than 10 seconds.
 
 ```bash
+# Linux / macOS
 brew tap mlhher/late && brew install late
+
+# Universal Fallback (Linux / macOS / Windows WSL)
+curl -sfL https://raw.githubusercontent.com/mlhher/late-cli/main/install.sh | bash
+
 cd your-project
 late
 ```
