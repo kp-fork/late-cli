@@ -19,9 +19,9 @@ cd your-project
 late
 ```
 
-> **未使用 Homebrew?**
+> **其他安装方式**
 > - **Arch Linux:** `yay -S late-cli-bin`
-> - **Linux / macOS / Windows:** 下载 [最新版本](https://github.com/mlhher/late-cli/releases) 并将其放入 PATH 环境变量中。*(macOS 手动下载: 如果被系统阻止，请执行 `xattr -d com.apple.quarantine /path/to/late`)*
+> - **Linux / macOS / 原生 Windows:** 下载 [最新版本](https://github.com/mlhher/late-cli/releases) 并将其放入 PATH 环境变量中。*(macOS 手动下载: 如果被系统阻止，请执行 `xattr -d com.apple.quarantine /path/to/late`)*
 > 
 > **连接云端模型?**
 > 默认情况本地模型 (如 `llama.cpp`，运行在 `:8080` 端口) 可开箱即用，无需配置。如果使用云端服务 (如 DeepSeek, 阿里云百炼, 通义千问, Claude, Gemini, OpenRouter 等)，请在运行前设置 `OPENAI_BASE_URL`，`OPENAI_API_KEY` 和 `OPENAI_MODEL` 环境变量。
