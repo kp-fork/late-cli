@@ -14,10 +14,11 @@ import (
 )
 
 type Config struct {
-	BaseURL string
-	APIKey  string
-	Model   string
-	Timeout time.Duration
+	BaseURL      string
+	APIKey       string
+	Model        string
+	Timeout      time.Duration
+	EnableImages bool
 }
 
 type BackendType string
@@ -347,7 +348,7 @@ func (c *Client) IsLlamaCPP() bool {
 func (c *Client) SupportsVision() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.supportsVision
+	return c.cfg.EnableImages || c.supportsVision
 }
 
 func (c *Client) marshalFlattened(req ChatCompletionRequest) ([]byte, error) {

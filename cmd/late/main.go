@@ -43,6 +43,7 @@ func main() {
 	appendSystemPromptReq := flag.String("append-system-prompt", "", "Append text to the system prompt after processing")
 	versionReq := flag.Bool("version", false, "Show version")
 	unsupervisedReq := flag.Bool("i-promise-i-have-backups-and-will-not-file-issues", false, "Unsupported: Execute all tools without supervision. Do not use this, bad things will happen. You have been warned.")
+	enableImagesReq := flag.Bool("enable-images", false, "Force enable support for image attachments for unsupported servers.")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of late:\n")
@@ -195,9 +196,10 @@ func main() {
 	// Initialize Core Components
 	resolvedOpenAIConfig := appconfig.ResolveOpenAISettings(appConfig)
 	resolvedClientConfig := client.Config{
-		BaseURL: resolvedOpenAIConfig.BaseURL,
-		APIKey:  resolvedOpenAIConfig.APIKey,
-		Model:   resolvedOpenAIConfig.Model,
+		BaseURL:      resolvedOpenAIConfig.BaseURL,
+		APIKey:       resolvedOpenAIConfig.APIKey,
+		Model:        resolvedOpenAIConfig.Model,
+		EnableImages: *enableImagesReq,
 	}
 	c := client.NewClient(resolvedClientConfig)
 	c.DiscoverBackend(context.Background())
@@ -210,9 +212,10 @@ func main() {
 		resolvedSubagentConfig.APIKey != resolvedOpenAIConfig.APIKey ||
 		resolvedSubagentConfig.Model != resolvedOpenAIConfig.Model {
 		subagentClient = client.NewClient(client.Config{
-			BaseURL: resolvedSubagentConfig.BaseURL,
-			APIKey:  resolvedSubagentConfig.APIKey,
-			Model:   resolvedSubagentConfig.Model,
+			BaseURL:      resolvedSubagentConfig.BaseURL,
+			APIKey:       resolvedSubagentConfig.APIKey,
+			Model:        resolvedSubagentConfig.Model,
+			EnableImages: *enableImagesReq,
 		})
 		subagentClient.DiscoverBackend(context.Background())
 	}
