@@ -77,10 +77,13 @@ func (t *ToolAdapter) Execute(ctx context.Context, args json.RawMessage) (string
 
 	output := sb.String()
 
-	// Truncate to ~1k tokens (~4000 chars)
-	const maxChars = 4000
-	if len(output) > maxChars {
-		output = output[:maxChars] + "\n\n[... truncated, output exceeded limit ...]"
+	// Truncate to 32,768 Unicode characters — matching the built-in tool limit
+	// (maxReadFileChars / maxBashOutputChars in internal/tool/implementations.go).
+	// Slicing by rune rather than byte prevents splitting multi-byte UTF-8 sequences.
+	const maxChars = 32768
+	runes := []rune(output)
+	if len(runes) > maxChars {
+		output = string(runes[:maxChars]) + "\n\n[... truncated, output exceeded limit ...]"
 	}
 
 	return output, nil
