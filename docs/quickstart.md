@@ -58,6 +58,7 @@ Late is a terminal UI with three areas: the **chat viewport** (scrollable histor
 | `Ctrl+X` | Clear all attached files |
 | `Esc` / `Ctrl+G` | Stop the current agent (cancel generation) |
 | `Ctrl+D` / `Ctrl+C` | Quit Late |
+| `Double-click` | Copy message to clipboard |
 
 > **Tip:** Late supports standard terminal editing like `Alt+Arrows` (word jump), `Ctrl+A/E` (start/end), and `Alt+Backspace/Del` (delete word).
 

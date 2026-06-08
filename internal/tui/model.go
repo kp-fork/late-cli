@@ -26,17 +26,17 @@ func NewModel(root common.Orchestrator, renderer *glamour.TermRenderer) Model {
 	ti.KeyMap.InsertNewline.SetEnabled(false)
 
 	// Set opaque background for textarea content
-	bgStyle := lipgloss.NewStyle().Background(lipgloss.Color("#191919")).Foreground(textColor)
+	bgStyle := lipgloss.NewStyle().Background(lipgloss.Color("#0E0E10")).Foreground(textColor)
 	styles := ti.Styles()
 	styles.Focused.Base = bgStyle
 	styles.Focused.Text = bgStyle
-	styles.Focused.Placeholder = bgStyle.Foreground(lipgloss.Color("#666666"))
+	styles.Focused.Placeholder = bgStyle.Foreground(lipgloss.Color("#4A4B50"))
 	styles.Focused.CursorLine = bgStyle
 	styles.Focused.Prompt = bgStyle
 
 	styles.Blurred.Base = bgStyle
 	styles.Blurred.Text = bgStyle
-	styles.Blurred.Placeholder = bgStyle.Foreground(lipgloss.Color("#666666"))
+	styles.Blurred.Placeholder = bgStyle.Foreground(lipgloss.Color("#4A4B50"))
 	styles.Blurred.CursorLine = bgStyle
 	styles.Blurred.Prompt = bgStyle
 	ti.SetStyles(styles)
@@ -82,9 +82,9 @@ func NewModel(root common.Orchestrator, renderer *glamour.TermRenderer) Model {
 
 	// Apply styles for visibility
 	s := filepicker.DefaultStyles()
-	s.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true)
+	s.Selected = lipgloss.NewStyle().Foreground(secondaryColor).Bold(true)
 	s.File = lipgloss.NewStyle().Foreground(textColor)
-	s.Directory = lipgloss.NewStyle().Foreground(lipgloss.Color("#5555FF")).Bold(true)
+	s.Directory = lipgloss.NewStyle().Foreground(primaryColor).Bold(true)
 	fp.Styles = s
 
 	m.FilePicker = fp

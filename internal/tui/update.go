@@ -10,6 +10,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 )
 
 // StreamMsg is the TUI-wrapper for session stream events
@@ -19,7 +20,15 @@ type StreamMsg struct {
 	Done   bool
 }
 
+type clearToastMsg struct{}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := msg.(clearToastMsg); ok {
+		m.ToastMessage = ""
+		m.updateViewport()
+		return m, nil
+	}
+
 	var (
 		tiCmd tea.Cmd
 		vpCmd tea.Cmd
@@ -41,6 +50,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.String() == "ctrl+x" {
 			m.AttachedFiles = nil
+			return m, nil
+		}
+		if msg.String() == "ctrl+h" {
+			if m.Mode == ViewHelp {
+				m.Mode = ViewChat
+			} else {
+				m.Mode = ViewHelp
+			}
+			focusedState := m.GetAgentState(m.Focused.ID())
+			focusedState.RenderedHistory = nil // Force re-render of history on toggle back
+			m.updateLayout()
 			return m, nil
 		}
 	}
@@ -120,6 +140,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.MouseMsg:
 		forwardToViewport = true
+		if clickMsg, ok := msg.(tea.MouseClickMsg); ok {
+			mouseMsg := clickMsg.Mouse()
+			if mouseMsg.Button == tea.MouseLeft {
+				if mouseMsg.Y >= 0 && mouseMsg.Y < m.Viewport.Height() {
+					now := time.Now().UnixMilli()
+					if now-m.LastClickTime < 500 && m.LastClickX == mouseMsg.X && m.LastClickY == mouseMsg.Y {
+						m.LastClickTime = 0 // prevent triple click from double-triggering
+						clickedLine := m.Viewport.YOffset() + mouseMsg.Y
+						s := m.GetAgentState(m.Focused.ID())
+						var foundBlock *RenderBlock
+						for _, block := range s.RenderBlocks {
+							if clickedLine >= block.StartLine && clickedLine <= block.EndLine {
+								foundBlock = &block
+								break
+							}
+						}
+						if foundBlock != nil && foundBlock.Content != "" {
+							err := clipboard.WriteAll(foundBlock.Content)
+							if err == nil {
+								m.ToastMessage = "copied response to clipboard"
+								if foundBlock.MessageIndex >= 0 {
+									history := m.Focused.History()
+									if foundBlock.MessageIndex < len(history) {
+										if history[foundBlock.MessageIndex].Role == "user" {
+											m.ToastMessage = "copied prompt to clipboard"
+										}
+									}
+								}
+								m.ToastExpireTime = time.Now().UnixMilli() + 3000
+								clearCmd := tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+									return clearToastMsg{}
+								})
+								m.updateViewport()
+								return m, clearCmd
+							}
+						}
+					} else {
+						m.LastClickX = mouseMsg.X
+						m.LastClickY = mouseMsg.Y
+						m.LastClickTime = now
+					}
+				}
+			}
+		}
 	case spinner.TickMsg:
 		// Only redraw on tick to animate tool calls/thinking if an agent is actually active
 		// AND showing a spinner inside the viewport. Status bar spinner animates via View().

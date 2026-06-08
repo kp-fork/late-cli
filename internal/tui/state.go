@@ -42,6 +42,14 @@ const (
 	AppPadding      = 0
 )
 
+// RenderBlock represents the line bounds of a rendered block in the viewport.
+type RenderBlock struct {
+	MessageIndex int    // -1 if active/streaming content
+	Content      string // raw copyable content
+	StartLine    int
+	EndLine      int
+}
+
 // AppState tracks the interactive state of a single orchestrator.
 type AppState struct {
 	State                ValidationState
@@ -70,6 +78,8 @@ type AppState struct {
 	LastChunks           []string // Cached result of splitMarkdownChunks
 	LastTail             string   // Cached result of splitMarkdownChunks
 	LastTotalContent     string   // To avoid redundant Viewport.SetContent calls
+
+	RenderBlocks        []RenderBlock // Line ranges of rendered blocks
 
 	ContextWarningShown bool // Whether the preflight context warning has been shown for the current input
 	Error               error
@@ -102,6 +112,13 @@ type Model struct {
 	FilePicker     filepicker.Model
 	AttachedFiles  []string
 	ShowFilePicker bool
+
+	// Double-click copy & Toast tracking
+	LastClickX      int
+	LastClickY      int
+	LastClickTime   int64
+	ToastMessage    string
+	ToastExpireTime int64
 
 	// Performance caches
 	cachedRenderer      *glamour.TermRenderer

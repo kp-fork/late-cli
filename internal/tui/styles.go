@@ -5,18 +5,18 @@ import (
 )
 
 var (
-	// Premium Palette - Deep Dark / Obsidian
-	primaryColor   = lipgloss.Color("#9B59B6") // Amethyst
-	secondaryColor = lipgloss.Color("#2ECC71") // Emerald
-	textColor      = lipgloss.Color("#ECF0F1") // Clouds
-	subtextColor   = lipgloss.Color("#95A5A6") // Concrete
-	warningColor   = lipgloss.Color("#F1C40F") // Sunflower/Yellow
+	// Premium Palette - Vesper Slate & Amber
+	primaryColor   = lipgloss.Color("#E5A85C") // Warm Amber Gold
+	secondaryColor = lipgloss.Color("#62B3D5") // Steel Blue
+	textColor      = lipgloss.Color("#F3F4F6") // Crisp Off-White
+	subtextColor   = lipgloss.Color("#8A94A6") // Muted Slate
+	warningColor   = lipgloss.Color("#EF4444") // Red/Orange warning
 
 	// Message Backgrounds
-	appBgColor     = lipgloss.Color("#191919")
-	userMsgBg      = lipgloss.Color("#16222A") // Very dark blue/black
+	appBgColor     = lipgloss.Color("#0E0E10") // Charcoal Black
+	userMsgBg      = lipgloss.Color("#16161B") // Slightly lighter cool charcoal
 	aiMsgBg        = appBgColor                // Keep alias for AI msgs
-	thoughtBgColor = lipgloss.Color("#101010") // Near black
+	thoughtBgColor = lipgloss.Color("#09090A") // Darker Charcoal for thinking
 
 	// Base Style for inheritance
 	baseStyle = lipgloss.NewStyle().Background(appBgColor)
@@ -31,7 +31,7 @@ var (
 
 	inputStyle = baseStyle.Copy().
 			Border(lipgloss.NormalBorder(), true, false, false, false).
-			BorderForeground(lipgloss.Color("#252525")).
+			BorderForeground(lipgloss.Color("#232329")).
 			BorderBackground(appBgColor).
 			MarginBackground(appBgColor).
 			Padding(0, 1).
@@ -77,7 +77,7 @@ var (
 			MarginLeft(4).
 			BorderLeft(true).
 			BorderStyle(lipgloss.ThickBorder()).
-			BorderForeground(lipgloss.Color("#555555")).
+			BorderForeground(lipgloss.Color("#3F4E5A")).
 			BorderBackground(thoughtBgColor)
 
 	tagStyle = lipgloss.NewStyle().
@@ -95,17 +95,14 @@ var (
 				Background(appBgColor).
 				MarginBackground(appBgColor).
 				Border(lipgloss.NormalBorder(), true, false, false, false).
-				BorderForeground(lipgloss.Color("#444444")).
+				BorderForeground(lipgloss.Color("#232329")).
 				BorderBackground(appBgColor).
 				Foreground(textColor)
 
 	statusModeStyle = lipgloss.NewStyle().
-			Background(primaryColor).
-			Foreground(textColor).
-			Padding(0, 1).
+			Foreground(primaryColor).
 			Bold(true).
-			MarginRight(1).
-			MarginBackground(appBgColor)
+			MarginRight(1)
 
 	statusKeyStyle = lipgloss.NewStyle().
 			Foreground(primaryColor).
@@ -120,10 +117,34 @@ var (
 			MarginLeft(1)
 
 	statusWarningStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#121212")).
-				Background(warningColor).
-				MarginBackground(appBgColor).
+				Foreground(warningColor).
+				Background(appBgColor).
 				Bold(true).
-				Padding(0, 1).
 				MarginLeft(1)
+
+	keycapStyle = lipgloss.NewStyle().
+			Foreground(secondaryColor).
+			Bold(true)
+
+	statusAttachedStyle = lipgloss.NewStyle().
+			Foreground(secondaryColor).
+			Background(appBgColor).
+			Bold(true)
+
+	statusTokenStyle = lipgloss.NewStyle().
+			Foreground(subtextColor)
+
+	// Breadcrumb styles
+	breadcrumbLateStyle = lipgloss.NewStyle().
+				Foreground(subtextColor).
+				Background(appBgColor)
+
+	breadcrumbSeparatorStyle = lipgloss.NewStyle().
+					Foreground(secondaryColor).
+					Background(appBgColor)
+
+	breadcrumbAgentStyle = lipgloss.NewStyle().
+				Foreground(textColor).
+				Background(appBgColor).
+				Bold(true)
 )

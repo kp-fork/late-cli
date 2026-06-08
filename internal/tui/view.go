@@ -3,6 +3,7 @@ package tui
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"math"
 	"path/filepath"
 	"runtime"
@@ -63,6 +64,7 @@ func (m Model) View() tea.View {
 	v := tea.NewView(content)
 	v.AltScreen = true
 	v.BackgroundColor = appBgColor
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -74,9 +76,24 @@ func (m *Model) inputView() string {
 
 	// Render textarea directly — its styles already set background via FocusedStyle/BlurredStyle
 	textareaView := m.Input.View()
+
+	// Dynamic border style: pulse separator color when active (thinking or streaming)
+	activeStyle := inputStyle.Copy()
+	s := m.GetAgentState(m.Focused.ID())
+	if s.State == StateThinking || s.State == StateStreaming {
+		ms := float64(time.Now().UnixNano()) / 1e6
+		pulse := (math.Sin(ms/250.0) + 1.0) / 2.0 // oscillate 0 to 1
+
+		targetColor := secondaryColor
+
+		borderGrad := lipgloss.Blend1D(100, lipgloss.Color("#232329"), targetColor)
+		pulseColor := borderGrad[int(pulse*99)]
+		activeStyle = activeStyle.BorderForeground(pulseColor)
+	}
+
 	// Sync width precisely: inputStyle (border 2 + padding 2) + w (m.Width - 4) = m.Width
 	// Internal width of inputStyle becomes m.Width - 8, matching m.Input.SetWidth()
-	content := inputStyle.Width(w).Render(textareaView)
+	content := activeStyle.Width(w).Render(textareaView)
 
 	// Wrap in a fixed-size container that fills the background
 	return baseStyle.Copy().
@@ -85,6 +102,73 @@ func (m *Model) inputView() string {
 		Padding(0, 2).
 		AlignVertical(lipgloss.Bottom).
 		Render(content)
+}
+
+// statusBg wraps a string in the status bar background color.
+// VTE-based terminals (Ptyxis, GNOME Console) don't inherit a container's
+// background after inner ANSI resets (\e[0m). Every character cell —
+// including plain spaces and separators — needs its own explicit background
+// to prevent the terminal's theme background from leaking through.
+var statusBgStyle = lipgloss.NewStyle().Background(appBgColor)
+
+func statusBg(s string) string {
+	return statusBgStyle.Render(s)
+}
+
+func (m *Model) renderMinimalEqualizer() string {
+	t := float64(time.Now().UnixMilli()) / 180.0
+	bars := []rune(" ▂▃▄▅▆▇█")
+	numBars := len(bars)
+
+	var cols [3]rune
+	for i := 0; i < 3; i++ {
+		phase := float64(i) * 1.5
+		val := (math.Sin(t+phase) + 1.0) / 2.0 // oscillates 0 to 1
+		idx := int(val * float64(numBars-1))
+		if idx < 0 {
+			idx = 0
+		}
+		if idx >= numBars {
+			idx = numBars - 1
+		}
+		cols[i] = bars[idx]
+	}
+
+	bracketStyle := lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor)
+	equalizerStyle := lipgloss.NewStyle().Foreground(secondaryColor).Background(appBgColor)
+
+	var sb strings.Builder
+	sb.WriteString(bracketStyle.Render("["))
+	for _, col := range cols {
+		sb.WriteString(equalizerStyle.Render(string(col)))
+	}
+	sb.WriteString(bracketStyle.Render("]"))
+	return sb.String()
+}
+
+func (m *Model) renderScannerTrack(symbol string, symbolColor color.Color) string {
+	t := float64(time.Now().UnixMilli()) / 120.0
+	pos := int(math.Round(2.5 + 2.5*math.Sin(t)))
+
+	track := []rune("──────")
+	if pos >= 0 && pos < len(track) {
+		track[pos] = []rune(symbol)[0]
+	}
+
+	bracketStyle := lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor)
+	symbolStyle := lipgloss.NewStyle().Foreground(symbolColor).Background(appBgColor)
+
+	var sb strings.Builder
+	sb.WriteString(bracketStyle.Render("["))
+	for _, r := range track {
+		if string(r) == symbol {
+			sb.WriteString(symbolStyle.Render(string(r)))
+		} else {
+			sb.WriteString(bracketStyle.Render(string(r)))
+		}
+	}
+	sb.WriteString(bracketStyle.Render("]"))
+	return sb.String()
 }
 
 func (m *Model) statusBarView() string {
@@ -96,17 +180,27 @@ func (m *Model) statusBarView() string {
 
 	s := m.GetAgentState(m.Focused.ID())
 
-	modeStr := " CHAT "
+	var leftSection string
 	statusText := s.StatusText
 
 	switch s.State {
 	case StateThinking:
-		modeStr = " THINKING "
+		scanner := m.renderScannerTrack("✦", primaryColor)
+		label := lipgloss.NewStyle().Foreground(primaryColor).Background(appBgColor).Bold(true).Render("working")
+		leftSection = scanner + statusBg(" ") + label
 	case StateStreaming:
-		modeStr = " STREAMING "
+		eq := m.renderMinimalEqualizer()
+		label := lipgloss.NewStyle().Foreground(secondaryColor).Background(appBgColor).Bold(true).Render("streaming")
+		leftSection = eq + statusBg(" ") + label
 	case StateConfirmTool:
-		modeStr = " CONFIRM "
+		icon := lipgloss.NewStyle().Foreground(warningColor).Background(appBgColor).Render("❖")
+		label := lipgloss.NewStyle().Foreground(warningColor).Background(appBgColor).Bold(true).Render("confirm")
+		leftSection = icon + statusBg(" ") + label
 		statusText = "Authorize Tool Execution (y/s/p/g/n)"
+	default:
+		bullet := lipgloss.NewStyle().Foreground(secondaryColor).Background(appBgColor).Render("●")
+		label := lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Render("idle")
+		leftSection = bullet + statusBg(" ") + label
 	}
 
 	// Check if any other agent is waiting for confirmation
@@ -120,80 +214,179 @@ func (m *Model) statusBarView() string {
 
 	var warning string
 	if otherWaiting {
-		warning = statusWarningStyle.Render(" SUBAGENT CONFIRMATION REQUIRED ")
+		warning = statusWarningStyle.Render("⚠️ SUBAGENT CONFIRM REQUIRED")
 		if strings.Contains(statusText, "spawned") {
 			statusText = ""
 		}
 	}
 
-	// Only breathe when agent is active
-	active := s.State == StateStreaming || s.State == StateThinking
-
-	var mode string
-	if active {
-		ms := float64(time.Now().UnixNano()) / 1e6
-		pulseFactor := (math.Sin(ms/700.0) + 1.0) / 2.0 // 0.0 to 1.0
-		grad := lipgloss.Blend1D(100, lipgloss.Color("#4A235A"), primaryColor)
-		breathColor := grad[int(pulseFactor*99)]
-		mode = statusModeStyle.Copy().Background(breathColor).Render(modeStr)
-	} else {
-		mode = statusModeStyle.Render(modeStr)
+	// If there's an active toast message, render it. Otherwise, standard status text.
+	var status string
+	hasToast := m.ToastMessage != "" && time.Now().UnixMilli() < m.ToastExpireTime
+	if hasToast {
+		status = lipgloss.NewStyle().Foreground(primaryColor).Background(appBgColor).Bold(true).Render("✓ " + m.ToastMessage)
+	} else if statusText != "" && statusText != "Working..." && statusText != "Ready" && statusText != "Closed" {
+		if s.State == StateConfirmTool {
+			status = statusWarningStyle.Render(statusText)
+		} else {
+			status = lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Italic(true).Render(statusText)
+		}
 	}
 
-	status := statusTextStyle.Render(statusText)
-
-	// Build key hints
-	stopKey := lipgloss.JoinHorizontal(lipgloss.Left, statusKeyStyle.Render("Ctrl+g"), statusTextStyle.Render(" Stop "))
-	attachHint := lipgloss.JoinHorizontal(lipgloss.Left, statusKeyStyle.Render("Ctrl+a/x"), statusTextStyle.Render(" Add/Clear attachments "))
-
-	// Add hierarchy hints
-	var hierarchyHint string
-	if len(m.Focused.Children()) > 0 {
-		hierarchyHint = lipgloss.JoinHorizontal(lipgloss.Left, statusKeyStyle.Render("Tab"), statusTextStyle.Render(" Subagents "))
+	// Append warning to status area if present
+	if warning != "" {
+		if status != "" {
+			status += statusBg("   ") + warning
+		} else {
+			status = warning
+		}
 	}
 
-	// Token count display (after status, before space)
-	maxTokens := m.Focused.MaxTokens()
-	tokenDisplay := fmt.Sprintf(" | %d", s.CumulativeTokenCount)
-	if maxTokens > 0 {
-		pct := (s.CumulativeTokenCount * 100) / maxTokens
-		tokenDisplay = fmt.Sprintf(" | %d/%d (%d%%)", s.CumulativeTokenCount, maxTokens, pct)
+	// Build breadcrumbs
+	var pathParts []string
+	curr := m.Focused
+	for curr != nil {
+		pathParts = append([]string{curr.ID()}, pathParts...)
+		curr = curr.Parent()
 	}
-	tokenStyled := statusKeyStyle.Render(tokenDisplay)
-	hints := lipgloss.JoinHorizontal(lipgloss.Left, hierarchyHint, attachHint, stopKey)
 
-	// Attached files count
+	var breadcrumbStr string
+	if len(pathParts) > 0 {
+		breadcrumbStr = breadcrumbLateStyle.Render("late")
+		for _, part := range pathParts {
+			breadcrumbStr += statusBg(" ") + breadcrumbSeparatorStyle.Render("›") + statusBg(" ") + breadcrumbAgentStyle.Render(part)
+		}
+	}
+
+	// Build right-side telemetry: Attached files, Token display flat, Breadcrumbs, Help
 	var attachedStr string
 	if len(m.AttachedFiles) > 0 {
-		attachedStr = statusKeyStyle.Foreground(lipgloss.Color("#00FF00")).Render(fmt.Sprintf(" Attached: %d ", len(m.AttachedFiles)))
+		attachedStr = statusAttachedStyle.Render(fmt.Sprintf("📎 %d files", len(m.AttachedFiles)))
 	}
 
-	// Truncate status text if it would push hints off-screen
-	fixedWidth := lipgloss.Width(mode) + lipgloss.Width(warning) + lipgloss.Width(tokenStyled) + lipgloss.Width(attachedStr) + lipgloss.Width(hints)
-	maxStatusWidth := w - fixedWidth - 1 // leave at least 1 char of space
-	if maxStatusWidth < 0 {
-		maxStatusWidth = 0
-	}
-	if lipgloss.Width(status) > maxStatusWidth {
-		statusText = m.truncateWithEllipsis(statusText, maxStatusWidth-2) // -2 for style padding
-		status = statusTextStyle.Render(statusText)
+	// Token display flat
+	maxTokens := m.Focused.MaxTokens()
+	var tokenStr string
+	if maxTokens > 0 {
+		pct := (s.CumulativeTokenCount * 100) / maxTokens
+		tokenStr = lipgloss.NewStyle().Foreground(secondaryColor).Background(appBgColor).Render(fmt.Sprintf("%d", s.CumulativeTokenCount)) +
+			statusBg(" / ") +
+			lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Render(fmt.Sprintf("%d", maxTokens)) +
+			statusBg(fmt.Sprintf(" t (%d%%)", pct))
+	} else {
+		tokenStr = lipgloss.NewStyle().Foreground(secondaryColor).Background(appBgColor).Render(fmt.Sprintf("%d", s.CumulativeTokenCount)) +
+			statusBg(" t")
 	}
 
-	spaceWidth := w - lipgloss.Width(mode) - lipgloss.Width(status) - lipgloss.Width(warning) - lipgloss.Width(tokenStyled) - lipgloss.Width(attachedStr) - lipgloss.Width(hints)
+	helpStr := lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Render("ctrl+h Help")
+
+	var rightParts []string
+	if attachedStr != "" {
+		rightParts = append(rightParts, attachedStr)
+	}
+	if tokenStr != "" {
+		rightParts = append(rightParts, tokenStr)
+	}
+	if breadcrumbStr != "" {
+		rightParts = append(rightParts, breadcrumbStr)
+	}
+	rightParts = append(rightParts, helpStr)
+	rightSection := strings.Join(rightParts, statusBg("   "))
+
+	// Adjust layout and truncate status text in the middle if necessary
+	usableW := w - 2 // Usable width excluding left/right padding space
+	if usableW < 1 {
+		usableW = 1
+	}
+
+	leftWidth := lipgloss.Width(leftSection)
+	rightWidth := lipgloss.Width(rightSection)
+
+	spaceWidth := usableW - leftWidth - rightWidth
+	if status != "" {
+		statusWidth := lipgloss.Width(status)
+		if statusWidth + 3 > spaceWidth {
+			// Truncate status text to fit
+			maxStatusW := spaceWidth - 3
+			if maxStatusW < 0 {
+				maxStatusW = 0
+			}
+			if hasToast {
+				truncated := m.truncateWithEllipsis("✓ " + m.ToastMessage, maxStatusW)
+				status = lipgloss.NewStyle().Foreground(primaryColor).Background(appBgColor).Bold(true).Render(truncated)
+			} else {
+				truncated := m.truncateWithEllipsis(statusText, maxStatusW)
+				if s.State == StateConfirmTool {
+					status = statusWarningStyle.Render(truncated)
+				} else {
+					status = lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Italic(true).Render(truncated)
+				}
+			}
+			statusWidth = lipgloss.Width(status)
+		}
+		if status != "" {
+			spaceWidth = spaceWidth - statusWidth - 3
+		}
+	}
+
 	if spaceWidth < 0 {
 		spaceWidth = 0
 	}
-	// Important: Use a style WITHOUT a border for the internal space filler to avoid duplication
-	spaceStyle := lipgloss.NewStyle().Background(appBgColor).MarginBackground(appBgColor)
-	space := spaceStyle.Width(spaceWidth).Render("")
 
-	content := lipgloss.JoinHorizontal(lipgloss.Left, mode, status, warning, tokenStyled, attachedStr, space, hints)
-	return statusBarBaseStyle.Width(w).Render(content)
+	space := statusBg(strings.Repeat(" ", spaceWidth))
+
+	var parts []string
+	parts = append(parts, leftSection)
+	if status != "" {
+		parts = append(parts, statusBg("   "), status)
+	}
+	parts = append(parts, space, rightSection)
+
+	content := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+	paddedContent := statusBg(" ") + content + statusBg(" ")
+	return statusBarBaseStyle.Width(w).Render(paddedContent)
 }
 
 
 func (m *Model) updateViewport() {
 	if m.Focused == nil {
+		return
+	}
+
+	if m.Mode == ViewHelp {
+		// Clear LastTotalContent so that when we toggle back, the cache mismatch is triggered
+		s := m.GetAgentState(m.Focused.ID())
+		s.LastTotalContent = ""
+
+		helpText := `# Late Help & Keybindings
+
+Here is a list of available keyboard shortcuts:
+
+  **ctrl+a**        Toggle File Picker (attach files to prompt)
+  **ctrl+x**        Clear attached files
+  **ctrl+g** / **esc**   Interrupt / stop active agent
+  **tab**           Switch focus between active subagents
+  **alt+enter**     Insert newline in prompt
+  **enter**         Submit prompt
+  **ctrl+h**        Toggle this Help menu
+
+Press **ctrl+h** or **esc** to return to the chat.`
+
+		// Total outer width is m.Viewport.Width()
+		// Usable inner width = outer width - padding (4) - border (2) = outer width - 6
+		msgWidth := m.Viewport.Width() - 6
+		if msgWidth < 1 {
+			msgWidth = 74
+		}
+		rendered := m.renderMarkdownBlock(helpText, msgWidth)
+		boxed := lipgloss.NewStyle().
+			Padding(1, 2).
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(secondaryColor).
+			Width(msgWidth).
+			Render(rendered)
+
+		m.Viewport.SetContent(boxed)
 		return
 	}
 
@@ -270,9 +463,26 @@ func (m *Model) updateViewport() {
 
 	// Build the full block list from cached history + active content
 	var blocks []string
-	for _, r := range s.RenderedHistory {
+	s.RenderBlocks = nil
+	currentLine := 0
+
+	for idx, r := range s.RenderedHistory {
 		if r != "" {
 			blocks = append(blocks, r)
+			linesCount := strings.Count(r, "\n") + 1
+			
+			copyText := history[idx].Content.String()
+			if history[idx].Role == "user" {
+				copyText = history[idx].Content.UIString()
+			}
+			
+			s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+				MessageIndex: idx,
+				Content:      copyText,
+				StartLine:    currentLine,
+				EndLine:      currentLine + linesCount - 1,
+			})
+			currentLine += linesCount
 		}
 	}
 
@@ -361,9 +571,29 @@ func (m *Model) updateViewport() {
 			activeParts = append(activeParts, m.renderAnimatedTag(fmt.Sprintf("%s %s", m.Spinner.View(), callStr), tagStyle, msgWidth+1, true))
 		}
 		if len(activeParts) > 0 {
-			blocks = append(blocks, strings.Join(activeParts, "\n"))
+			r := strings.Join(activeParts, "\n")
+			blocks = append(blocks, r)
+			linesCount := strings.Count(r, "\n") + 1
+			
+			s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+				MessageIndex: -1,
+				Content:      s.StreamingState.Content,
+				StartLine:    currentLine,
+				EndLine:      currentLine + linesCount - 1,
+			})
+			currentLine += linesCount
 		} else if s.State == StateThinking {
-			blocks = append(blocks, m.renderAnimatedTag("Thinking", thinkingStyle, msgWidth-2, true))
+			r := m.renderAnimatedTag("Thinking", thinkingStyle, msgWidth-2, true)
+			blocks = append(blocks, r)
+			linesCount := strings.Count(r, "\n") + 1
+			
+			s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+				MessageIndex: -1,
+				Content:      "Thinking...",
+				StartLine:    currentLine,
+				EndLine:      currentLine + linesCount - 1,
+			})
+			currentLine += linesCount
 		}
 	}
 
@@ -376,34 +606,94 @@ func (m *Model) updateViewport() {
 		}
 		prompt := fmt.Sprintf("The agent wants to execute a **%s** command.\n\n```json\n%s\n```\n\n> Press **[y]** Allow once | **[s]** Allow always (session) | **[p]** Allow always (project) | **[g]** Allow always (global) | **[n]** Deny", displayName, tc.Function.Arguments)
 		md, _ := m.Renderer.Render(prompt)
-		blocks = append(blocks, aiMsgStyle.Width(msgWidth+1).Border(lipgloss.DoubleBorder()).BorderForeground(lipgloss.Color("#FFD700")).Render(md))
+		r := aiMsgStyle.Width(msgWidth+1).Border(lipgloss.DoubleBorder()).BorderForeground(warningColor).Render(md)
+		blocks = append(blocks, r)
+		linesCount := strings.Count(r, "\n") + 1
+		
+		s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+			MessageIndex: -1,
+			Content:      tc.Function.Arguments,
+			StartLine:    currentLine,
+			EndLine:      currentLine + linesCount - 1,
+		})
+		currentLine += linesCount
 	}
 
 	if s.State == StateContextWarning {
 		prompt := "⚠️ **Context Limit Warning**\n\nYou are approaching the maximum context size for this session (over 90% used). It is highly recommended to **start a new session** to ensure the agent maintains full context and accuracy.\n\n> Press **[Enter]** again to proceed anyway, or start a new session."
 		md, _ := m.Renderer.Render(prompt)
-		blocks = append(blocks, aiMsgStyle.Width(msgWidth+1).Border(lipgloss.DoubleBorder()).BorderForeground(warningColor).Render(md))
+		r := aiMsgStyle.Width(msgWidth+1).Border(lipgloss.DoubleBorder()).BorderForeground(warningColor).Render(md)
+		blocks = append(blocks, r)
+		linesCount := strings.Count(r, "\n") + 1
+		
+		s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+			MessageIndex: -1,
+			Content:      prompt,
+			StartLine:    currentLine,
+			EndLine:      currentLine + linesCount - 1,
+		})
+		currentLine += linesCount
 	}
 
 	if s.Error != nil {
 		errStr := s.Error.Error()
+		var prompt string
+		var r string
 		if strings.Contains(errStr, "exceeds the available context size") || strings.Contains(errStr, "context_length_exceeded") {
-			prompt := "🛑 **Context Limit Exceeded**\n\nThis session has hit the model's absolute context limit. The agent cannot proceed further in this session.\n\n**Action Required:** Please **start a new session** to continue your work."
+			prompt = "🛑 **Context Limit Exceeded**\n\nThis session has hit the model's absolute context limit. The agent cannot proceed further in this session.\n\n**Action Required:** Please **start a new session** to continue your work."
 			md, _ := m.Renderer.Render(prompt)
-			blocks = append(blocks, aiMsgStyle.Width(msgWidth+1).Border(lipgloss.DoubleBorder()).BorderForeground(lipgloss.Color("#FF0000")).Render(md))
+			r = aiMsgStyle.Width(msgWidth+1).Border(lipgloss.DoubleBorder()).BorderForeground(lipgloss.Color("#FF0000")).Render(md)
 		} else {
-			blocks = append(blocks, thinkingStyle.Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %v", s.Error)))
+			prompt = fmt.Sprintf("Error: %v", s.Error)
+			r = thinkingStyle.Foreground(lipgloss.Color("#FF0000")).Render(prompt)
 		}
+		blocks = append(blocks, r)
+		linesCount := strings.Count(r, "\n") + 1
+		
+		s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+			MessageIndex: -1,
+			Content:      prompt,
+			StartLine:    currentLine,
+			EndLine:      currentLine + linesCount - 1,
+		})
+		currentLine += linesCount
 	} else if m.Err != nil {
-		blocks = append(blocks, thinkingStyle.Foreground(lipgloss.Color("#FF0000")).Render(fmt.Sprintf("Error: %v", m.Err)))
+		prompt := fmt.Sprintf("Error: %v", m.Err)
+		r := thinkingStyle.Foreground(lipgloss.Color("#FF0000")).Render(prompt)
+		blocks = append(blocks, r)
+		linesCount := strings.Count(r, "\n") + 1
+		
+		s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+			MessageIndex: -1,
+			Content:      prompt,
+			StartLine:    currentLine,
+			EndLine:      currentLine + linesCount - 1,
+		})
+		currentLine += linesCount
 	}
 
 	// Render Queued Messages
 	for _, msg := range m.Focused.QueuedMessages() {
-		blocks = append(blocks, queuedMsgStyle.Width(msgWidth+1).Render(msg))
+		r := queuedMsgStyle.Width(msgWidth+1).Render(msg)
+		blocks = append(blocks, r)
+		linesCount := strings.Count(r, "\n") + 1
+		
+		s.RenderBlocks = append(s.RenderBlocks, RenderBlock{
+			MessageIndex: -1,
+			Content:      msg,
+			StartLine:    currentLine,
+			EndLine:      currentLine + linesCount - 1,
+		})
+		currentLine += linesCount
 	}
 
-	fullContent := strings.Join(blocks, "\n")
+	var fullContent string
+	if len(blocks) == 0 {
+		fullContent = "Welcome to Late. Type your prompt below."
+	} else {
+		fullContent = strings.Join(blocks, "\n")
+	}
+
 	if fullContent == s.LastTotalContent && m.LastFocusedID == m.Focused.ID() {
 		return
 	}
