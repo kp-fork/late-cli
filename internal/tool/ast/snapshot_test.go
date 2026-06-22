@@ -20,13 +20,13 @@ var unixCorpus = []snapshotEntry{
 	{"ls -rt", false, false},
 	{"date", false, false},
 	{"echo 'hello world'", false, false},
-	{"echo $HOME", false, true},         // expansion
+	{"echo $HOME", false, false},         // expansion
 	{"cd /tmp", true, true},             // cd blocked
 	{"ls > out.txt", true, true},        // redirect blocked
 	{"echo foo >> bar.txt", true, true}, // redirect blocked
 	{"ls | grep foo", false, false},     // safe pipe (allowlisted in corpus)
-	{"(ls)", false, true},               // subshell
-	{"echo $(ls)", false, true},         // subshell
+	{"(ls)", false, false},               // subshell
+	{"echo $(ls)", false, false},         // subshell
 	{"ls; pwd", false, false},           // safe compound
 	{"mkdir foo", false, true},          // unknown command
 	{"cd /tmp; ls", true, true},         // cd in compound

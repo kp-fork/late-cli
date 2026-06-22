@@ -1,7 +1,9 @@
 package ast
 
-import "fmt"
-
+import (
+	"fmt"
+	"strings"
+)
 // tier2Commands is the set of commands that have mandatory subcommands.
 // The AST adapters should emit compound command keys (e.g. "git log", "go mod")
 // for these commands to maintain fine-grained allow-list granularity.
@@ -75,28 +77,34 @@ func (p *PolicyEngine) Decide(ir ParsedIR) Decision {
 		return d
 	}
 
-	// 4–7. Soft signals → NeedsConfirmation.
-	for _, soft := range []ReasonCode{ReasonInvokeExpr, ReasonSubshell, ReasonExpansion, ReasonDestructive} {
+	// 4. Hard-prompt for deletion commands.
+	// Even if explicitly allow-listed, we always prompt for rm to prevent
+	// catastrophic scenarios caused by the positional argument loophole.
+	for _, cmd := range ir.Commands {
+		cmdLower := strings.ToLower(cmd)
+		if cmdLower == "rm" || cmdLower == "rmdir" || cmdLower == "unlink" ||
+			cmdLower == "remove-item" || cmdLower == "del" || cmdLower == "erase" ||
+			cmdLower == "rd" || cmdLower == "ri" {
+			d.NeedsConfirmation = true
+			return d
+		}
+	}
+
+	// 5. Allow-list check: if every command is explicitly allow-listed, approve.
+	// This overrides soft signals (e.g. destructive cmdlets, expansions) because the user
+	// explicitly approved this exact command invocation.
+	isAllowlisted := len(ir.Commands) > 0 && p.allCommandsAllowlisted(ir)
+	if isAllowlisted {
+		return d
+	}
+
+	// 6. Soft signals & Operators → NeedsConfirmation.
+	// If the command is not explicitly allowlisted, these signals force a prompt.
+	for _, soft := range []ReasonCode{ReasonInvokeExpr, ReasonSubshell, ReasonExpansion, ReasonDestructive, ReasonOperator} {
 		if hasRisk(ir, soft) {
 			d.NeedsConfirmation = true
 			return d
 		}
-	}
-
-	// 8. Operator signal (&&, ||, ;, |).
-	// Any compound/pipe where all commands are allow-listed is permitted;
-	// otherwise require confirmation.
-	if hasRisk(ir, ReasonOperator) {
-		if !p.allCommandsAllowlisted(ir) {
-			d.NeedsConfirmation = true
-			return d
-		}
-		// All commands allowlisted — fall through to auto-approve.
-	}
-
-	// 9. Allow-list check: if every command is explicitly allow-listed, approve.
-	if len(ir.Commands) > 0 && p.allCommandsAllowlisted(ir) {
-		return d
 	}
 
 	// Default: unknown command combination → require confirmation.
