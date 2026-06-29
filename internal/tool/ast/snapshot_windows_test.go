@@ -26,7 +26,7 @@ var windowsCorpus = []snapshotEntry{
 	// $env:VAR IS a dynamic expansion — must require confirmation.
 	{"Write-Output $env:USERNAME", false, false},
 	// Risky: subshell (sub-expression).
-	{"Write-Output $(Get-Date)", false, false},
+	{"Write-Output $(Get-Date)", false, true},
 	// Risky: Invoke-Command (dynamic eval). The script-block syntax itself is
 	// not the risk signal — invoke-command is.
 	{"Invoke-Command -ScriptBlock { rm -rf / }", false, true},

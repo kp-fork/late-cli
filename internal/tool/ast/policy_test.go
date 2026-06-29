@@ -85,13 +85,36 @@ func TestPolicyEngine_Decide_DeletionOverridesAllowlist(t *testing.T) {
 	}
 }
 
+func TestPolicyEngine_Decide_HighRiskSoftSignalsAlwaysPrompt(t *testing.T) {
+	pe := &PolicyEngine{
+		AllowedCommands: map[string]map[string]bool{
+			"set-content": {"-value": true},
+		},
+	}
+	// Expansions also prompt here because set-content is not an allowed output command
+	for _, rc := range []ReasonCode{ReasonSubshell, ReasonExpansion, ReasonInvokeExpr} {
+		t.Run(string(rc), func(t *testing.T) {
+			ir := emptyIR(PlatformWindows)
+			ir.Commands = []string{"set-content"}
+			ir.CommandArgs = map[string][]string{
+				"set-content": {"-value"},
+			}
+			ir.RiskFlags = []ReasonCode{rc}
+			d := pe.Decide(ir)
+			if !d.NeedsConfirmation {
+				t.Errorf("expected NeedsConfirmation for %v even if command is allowlisted", rc)
+			}
+		})
+	}
+}
+
 func TestPolicyEngine_Decide_AllowlistOverridesSoftSignals(t *testing.T) {
 	pe := &PolicyEngine{
 		AllowedCommands: map[string]map[string]bool{
 			"set-content": {"-value": true},
 		},
 	}
-	for _, rc := range []ReasonCode{ReasonSubshell, ReasonExpansion, ReasonInvokeExpr, ReasonDestructive, ReasonOperator} {
+	for _, rc := range []ReasonCode{ReasonDestructive, ReasonOperator} {
 		t.Run(string(rc), func(t *testing.T) {
 			ir := emptyIR(PlatformWindows)
 			ir.Commands = []string{"set-content"}

@@ -90,17 +90,39 @@ func (p *PolicyEngine) Decide(ir ParsedIR) Decision {
 		}
 	}
 
-	// 5. Allow-list check: if every command is explicitly allow-listed, approve.
-	// This overrides soft signals (e.g. destructive cmdlets, expansions) because the user
-	// explicitly approved this exact command invocation.
+	// 5. High-Risk Soft Signals (Always prompt)
+	if hasRisk(ir, ReasonSubshell) || hasRisk(ir, ReasonInvokeExpr) {
+		d.NeedsConfirmation = true
+		return d
+	}
+
+	// 6. Expansion handling (Balanced approach)
+	if hasRisk(ir, ReasonExpansion) {
+		// Only allow expansions for harmless output commands
+		allOutput := len(ir.Commands) > 0
+		for _, cmd := range ir.Commands {
+			cmdLower := strings.ToLower(cmd)
+			if cmdLower != "echo" && cmdLower != "write-output" && cmdLower != "write-host" && cmdLower != "printf" {
+				allOutput = false
+				break
+			}
+		}
+		if !allOutput {
+			d.NeedsConfirmation = true
+			return d
+		}
+	}
+
+	// 7. Allow-list check: if every command is explicitly allow-listed, approve.
+	// This overrides ReasonDestructive and ReasonOperator.
 	isAllowlisted := len(ir.Commands) > 0 && p.allCommandsAllowlisted(ir)
 	if isAllowlisted {
 		return d
 	}
 
-	// 6. Soft signals & Operators → NeedsConfirmation.
+	// 8. Remaining Soft Signals & Operators → NeedsConfirmation.
 	// If the command is not explicitly allowlisted, these signals force a prompt.
-	for _, soft := range []ReasonCode{ReasonInvokeExpr, ReasonSubshell, ReasonExpansion, ReasonDestructive, ReasonOperator} {
+	for _, soft := range []ReasonCode{ReasonDestructive, ReasonOperator} {
 		if hasRisk(ir, soft) {
 			d.NeedsConfirmation = true
 			return d
