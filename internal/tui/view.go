@@ -544,6 +544,7 @@ Press **ctrl+h** or **esc** to return to the chat.`
 			Border(lipgloss.DoubleBorder()).
 			BorderForeground(secondaryColor).
 			Width(msgWidth).
+			Background(appBgColor).
 			Render(rendered)
 
 		m.Viewport.SetContent(boxed)
@@ -861,7 +862,11 @@ Press **ctrl+h** or **esc** to return to the chat.`
 	m.LastFocusedID = m.Focused.ID()
 
 	atBottom := m.Viewport.AtBottom()
-	m.Viewport.SetContent(fullContent)
+	paddedContent := lipgloss.NewStyle().
+		Width(m.Viewport.Width()).
+		Background(appBgColor).
+		Render(fullContent)
+	m.Viewport.SetContent(paddedContent)
 	if atBottom {
 		m.Viewport.GotoBottom()
 	}
@@ -1014,7 +1019,8 @@ Your AI coding agent. Type a prompt below to get started.
 
 	return lipgloss.NewStyle().
 		Padding(1, 2).
-		Width(msgWidth).
+		Width(m.Viewport.Width()).
+		Background(appBgColor).
 		Render(rendered)
 }
 
@@ -1041,6 +1047,7 @@ func (m *Model) renderCommitLogView() {
 			Border(lipgloss.DoubleBorder()).
 			BorderForeground(primaryColor).
 			Width(msgWidth).
+			Background(appBgColor).
 			Render(rendered)
 		m.Viewport.SetContent(boxed)
 		return
@@ -1133,7 +1140,11 @@ func (m *Model) renderCommitLogView() {
 		Render(fmt.Sprintf("↑↓ navigate · Enter view · Esc back  (%d commits)", len(m.CommitEntries)))
 	lines = append(lines, "", footer)
 
-	m.Viewport.SetContent(strings.Join(lines, "\n"))
+	paddedContent := lipgloss.NewStyle().
+		Width(m.Viewport.Width()).
+		Background(appBgColor).
+		Render(strings.Join(lines, "\n"))
+	m.Viewport.SetContent(paddedContent)
 }
 
 // overlayCentered places the dialog string centered over the background string,
