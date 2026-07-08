@@ -113,6 +113,7 @@ func (c *Client) ChatCompletion(ctx context.Context, req ChatCompletionRequest) 
 // ChatCompletionStream streams responses from the OpenAI-compatible endpoint.
 func (c *Client) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan ChatCompletionChunk, <-chan error) {
 	req.Stream = true
+	req.StreamOptions = &StreamOptions{IncludeUsage: true}
 	out := make(chan ChatCompletionChunk)
 	errCh := make(chan error, 1)
 
