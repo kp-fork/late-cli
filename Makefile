@@ -2,7 +2,7 @@
 
 # Project variables
 BINARY_NAME=late
-VERSION?=1.4.0
+VERSION?=1.4.1
 
 # Go compiler flags
 LDFLAGS=-ldflags "-X late/internal/common.Version=${VERSION}"
