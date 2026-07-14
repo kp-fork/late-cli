@@ -550,7 +550,8 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 						if err != nil {
 							return composeFinishedMsg{err: err}
 						}
-						return composeFinishedMsg{content: string(data)}
+						content := strings.TrimRight(string(data), "\r\n")
+						return composeFinishedMsg{content: content}
 					})
 
 					return m, execCmd
