@@ -73,16 +73,19 @@ func (m Model) View() tea.View {
 }
 
 func (m *Model) inputView() string {
-	w := m.Width - 4 // Internal padding for input
-	if w < 1 {
-		w = 1
-	}
-
-	// Render textarea directly — its styles already set background via FocusedStyle/BlurredStyle
+	// Render textarea directly
 	textareaView := m.Input.View()
+	paddedTextarea := lipgloss.NewStyle().Padding(0, 1).Background(appBgColor).Render(textareaView)
 
-	// Dynamic border style: pulse separator color when active (thinking or streaming)
-	activeStyle := inputStyle.Copy()
+	// Dynamic border style on the outer container: pulse separator color when active
+	outerStyle := baseStyle.Copy().
+		Width(m.Width).
+		AlignVertical(lipgloss.Bottom).
+		Border(lipgloss.NormalBorder(), true, false, false, false).
+		BorderForeground(lipgloss.Color("#232329")).
+		BorderBackground(appBgColor).
+		MarginBackground(appBgColor)
+
 	s := m.GetAgentState(m.Focused.ID())
 	if s.State == StateThinking || s.State == StateStreaming {
 		ms := float64(time.Now().UnixNano()) / 1e6
@@ -92,20 +95,10 @@ func (m *Model) inputView() string {
 
 		borderGrad := lipgloss.Blend1D(100, lipgloss.Color("#232329"), targetColor)
 		pulseColor := borderGrad[int(pulse*99)]
-		activeStyle = activeStyle.BorderForeground(pulseColor)
+		outerStyle = outerStyle.BorderForeground(pulseColor)
 	}
 
-	// Sync width precisely: inputStyle (border 2 + padding 2) + w (m.Width - 4) = m.Width
-	// Internal width of inputStyle becomes m.Width - 8, matching m.Input.SetWidth()
-	content := activeStyle.Width(w).Render(textareaView)
-
-	// Wrap in a dynamic-size container that fills the background
-	return baseStyle.Copy().
-		Width(m.Width).
-		Height(m.Input.Height() + 1).
-		Padding(0, 2).
-		AlignVertical(lipgloss.Bottom).
-		Render(content)
+	return outerStyle.Render(paddedTextarea)
 }
 
 // autocompleteView renders the slash-command autocomplete dropdown.

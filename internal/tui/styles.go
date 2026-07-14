@@ -30,8 +30,6 @@ var (
 			Foreground(textColor)
 
 	inputStyle = baseStyle.Copy().
-			Border(lipgloss.NormalBorder(), true, false, false, false).
-			BorderForeground(lipgloss.Color("#232329")).
 			BorderBackground(appBgColor).
 			MarginBackground(appBgColor).
 			Padding(0, 1)

@@ -878,7 +878,7 @@ func (m *Model) updateLayout() {
 	}
 
 	availableWidth := m.Width
-	m.Input.SetWidth(availableWidth - 8)
+	m.Input.SetWidth(availableWidth - 2)
 
 	m.Viewport.SetWidth(availableWidth)
 	vHeight := m.Height - (m.Input.Height() + 1) - StatusBarHeight - AppPadding
