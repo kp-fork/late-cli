@@ -99,10 +99,10 @@ func (m *Model) inputView() string {
 	// Internal width of inputStyle becomes m.Width - 8, matching m.Input.SetWidth()
 	content := activeStyle.Width(w).Render(textareaView)
 
-	// Wrap in a fixed-size container that fills the background
+	// Wrap in a dynamic-size container that fills the background
 	return baseStyle.Copy().
 		Width(m.Width).
-		Height(InputHeight).
+		Height(m.Input.Height() + 1).
 		Padding(0, 2).
 		AlignVertical(lipgloss.Bottom).
 		Render(content)

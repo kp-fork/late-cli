@@ -25,6 +25,20 @@ type StreamMsg struct {
 type clearToastMsg struct{}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	oldHeight := m.Input.Height()
+	oldShowAuto := m.ShowAutocomplete
+	oldAutoLen := len(m.AutocompleteItems)
+	oldMode := m.Mode
+
+	newModel, cmd := m.updateInternal(msg)
+
+	if newModel.Input.Height() != oldHeight || newModel.ShowAutocomplete != oldShowAuto || len(newModel.AutocompleteItems) != oldAutoLen || newModel.Mode != oldMode {
+		newModel.updateLayout()
+	}
+	return newModel, cmd
+}
+
+func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 	if _, ok := msg.(clearToastMsg); ok {
 		m.ToastMessage = ""
 		m.updateViewport()
@@ -748,7 +762,7 @@ func (m *Model) updateLayout() {
 	m.Input.SetWidth(availableWidth - 8)
 
 	m.Viewport.SetWidth(availableWidth)
-	vHeight := m.Height - InputHeight - StatusBarHeight - AppPadding
+	vHeight := m.Height - (m.Input.Height() + 1) - StatusBarHeight - AppPadding
 
 	// Reserve space for autocomplete dropdown
 	if m.ShowAutocomplete && len(m.AutocompleteItems) > 0 {

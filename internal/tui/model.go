@@ -19,7 +19,10 @@ func NewModel(root common.Orchestrator, renderer *glamour.TermRenderer) Model {
 	ti.Focus()
 	ti.CharLimit = 100000 // Allow pasting large code blocks
 	ti.SetWidth(72)
-	ti.SetHeight(InputHeight - 2)
+	ti.DynamicHeight = true
+	ti.MinHeight = 1
+	ti.MaxHeight = 4
+	ti.SetHeight(1)
 	ti.ShowLineNumbers = false
 	ti.Prompt = ""    // Remove the line prompt characters
 	ti.SetValue("> ") // Set initial "fake" prompt to force background render logic on first line
