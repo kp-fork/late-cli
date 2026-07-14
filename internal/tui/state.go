@@ -47,6 +47,7 @@ const (
 // AvailableCommands lists all slash commands available in the TUI.
 var AvailableCommands = []string{
 	"/clear",
+	"/compose",
 	"/help",
 	"/log",
 	"/quit",

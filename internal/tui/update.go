@@ -6,6 +6,7 @@ import (
 	"late/internal/git"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -23,6 +24,11 @@ type StreamMsg struct {
 }
 
 type clearToastMsg struct{}
+
+type composeFinishedMsg struct {
+	content string
+	err     error
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	oldHeight := m.Input.Height()
@@ -94,6 +100,15 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 	// Internal Messages
 	if msg, ok := msg.(SetMessengerMsg); ok {
 		m.Messenger = msg.Messenger
+		return m, nil
+	}
+	if msg, ok := msg.(composeFinishedMsg); ok {
+		if msg.err != nil {
+			m.Err = msg.err
+			return m, nil
+		}
+		m.Input.SetValue("> " + msg.content)
+		m.Input.CursorEnd()
 		return m, nil
 	}
 
@@ -445,6 +460,55 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 
 			// Slash commands (trim spaces so autocomplete-added trailing space still works)
 			cmd := strings.TrimSpace(input)
+			if strings.HasPrefix(input, "/compose") {
+				if input == "/compose" || strings.HasPrefix(input, "/compose ") {
+					text := strings.TrimPrefix(input, "/compose")
+					text = strings.TrimSpace(text)
+
+					tempFile, err := os.CreateTemp("", "late-compose-*.md")
+					if err != nil {
+						m.Err = err
+						return m, nil
+					}
+
+					if text != "" {
+						if _, err := tempFile.Write([]byte(text)); err != nil {
+							tempFile.Close()
+							os.Remove(tempFile.Name())
+							m.Err = err
+							return m, nil
+						}
+					}
+					tempFile.Close()
+
+					editor := os.Getenv("EDITOR")
+					if editor == "" {
+						editor = "vi"
+					}
+
+					c := exec.Command(editor, tempFile.Name())
+
+					m.Input.Reset()
+					m.Input.SetValue("> ")
+					m.ShowAutocomplete = false
+					m.AutocompleteItems = nil
+					m.AutocompleteIndex = 0
+
+					execCmd := tea.ExecProcess(c, func(err error) tea.Msg {
+						defer os.Remove(tempFile.Name())
+						if err != nil {
+							return composeFinishedMsg{err: err}
+						}
+						data, err := os.ReadFile(tempFile.Name())
+						if err != nil {
+							return composeFinishedMsg{err: err}
+						}
+						return composeFinishedMsg{content: string(data)}
+					})
+
+					return m, execCmd
+				}
+			}
 			if cmd == "/quit" {
 				return m, tea.Quit
 			}
