@@ -118,7 +118,7 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 				forwardToInput = false
 			}
 		case "up", "down":
-			if m.Mode == ViewChat {
+			if m.Mode == ViewChat && strings.TrimPrefix(m.Input.Value(), "> ") == "" {
 				forwardToInput = false
 			}
 		}
@@ -581,12 +581,12 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 
 		case "up":
-			if m.Mode == ViewChat {
+			if m.Mode == ViewChat && strings.TrimPrefix(m.Input.Value(), "> ") == "" {
 				return m.navigateHistory(-1), nil
 			}
 
 		case "down":
-			if m.Mode == ViewChat {
+			if m.Mode == ViewChat && strings.TrimPrefix(m.Input.Value(), "> ") == "" {
 				return m.navigateHistory(1), nil
 			}
 
