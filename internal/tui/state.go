@@ -142,6 +142,7 @@ type Model struct {
 
 	// Paste detection
 	lastInputLen int // Length of input after previous update, to detect pastes
+	Pastes       map[string]string
 
 	// Input history (ring buffer via slice)
 	InputHistory   []string // Previously submitted prompts, oldest first

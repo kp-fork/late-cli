@@ -126,6 +126,34 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Filter key events that were consumed by updateChat during confirmation
 	forwardToInput := true
+
+	if pasteMsg, ok := msg.(tea.PasteMsg); ok {
+		text := pasteMsg.Content
+		lineCount := strings.Count(text, "\n") + 1
+		if lineCount > 3 {
+			placeholder := fmt.Sprintf("[Pasted #%d lines]", lineCount)
+			if m.Pastes == nil {
+				m.Pastes = make(map[string]string)
+			}
+			placeholderWithIndex := placeholder
+			counter := 1
+			for {
+				if _, exists := m.Pastes[placeholderWithIndex]; !exists {
+					break
+				}
+				placeholderWithIndex = fmt.Sprintf("[Pasted #%d lines (%d)]", lineCount, counter)
+				counter++
+			}
+			m.Pastes[placeholderWithIndex] = text
+			m.Input.InsertString(placeholderWithIndex)
+
+			m.ToastMessage = fmt.Sprintf("pasted %d lines (%d chars)", lineCount, len(text))
+			m.ToastExpireTime = time.Now().UnixMilli() + 2500
+
+			forwardToInput = false
+		}
+	}
+
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "y", "Y", "n", "N", "s", "S", "p", "P", "g", "G":
@@ -167,13 +195,32 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 		pastedText := m.Input.Value()[m.lastInputLen:]
 		lineCount := strings.Count(pastedText, "\n") + 1
 		charCount := currentLen - m.lastInputLen
-		if lineCount >= 3 {
+		if lineCount > 3 {
+			placeholder := fmt.Sprintf("[Pasted #%d lines]", lineCount)
+			if m.Pastes == nil {
+				m.Pastes = make(map[string]string)
+			}
+			placeholderWithIndex := placeholder
+			counter := 1
+			for {
+				if _, exists := m.Pastes[placeholderWithIndex]; !exists {
+					break
+				}
+				placeholderWithIndex = fmt.Sprintf("[Pasted #%d lines (%d)]", lineCount, counter)
+				counter++
+			}
+			m.Pastes[placeholderWithIndex] = pastedText
+
+			beforePaste := m.Input.Value()[:m.lastInputLen]
+			m.Input.SetValue(beforePaste + placeholderWithIndex)
+			m.Input.CursorEnd()
+
 			m.ToastMessage = fmt.Sprintf("pasted %d lines (%d chars)", lineCount, charCount)
 			m.ToastExpireTime = time.Now().UnixMilli() + 2500
 			clearCmd := tea.Tick(2500*time.Millisecond, func(t time.Time) tea.Msg {
 				return clearToastMsg{}
 			})
-			m.lastInputLen = currentLen
+			m.lastInputLen = len(m.Input.Value())
 			return m, clearCmd
 		}
 	}
@@ -524,6 +571,7 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 				m.Input.Reset()
 				m.Input.SetValue("> ")
 				m.Focused.Reset()
+				m.Pastes = make(map[string]string)
 				for _, state := range m.AgentStates {
 					state.RenderedHistory = nil
 					state.CumulativeTokenCount = 0
@@ -589,15 +637,22 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 				}
 			}
 
-			if err := m.Focused.Submit(input, m.AttachedFiles); err != nil {
+			// Replace pasted placeholders with original content
+			expandedInput := input
+			for placeholder, original := range m.Pastes {
+				expandedInput = strings.ReplaceAll(expandedInput, placeholder, original)
+			}
+
+			if err := m.Focused.Submit(expandedInput, m.AttachedFiles); err != nil {
 				m.Err = err
 				return m, nil
 			}
 
 			// Save to input history (avoid consecutive duplicates)
-			if len(m.InputHistory) == 0 || m.InputHistory[len(m.InputHistory)-1] != input {
-				m.InputHistory = append(m.InputHistory, input)
+			if len(m.InputHistory) == 0 || m.InputHistory[len(m.InputHistory)-1] != expandedInput {
+				m.InputHistory = append(m.InputHistory, expandedInput)
 			}
+			m.Pastes = make(map[string]string)
 			m.HistoryIndex = -1
 			m.HistoryWorking = ""
 

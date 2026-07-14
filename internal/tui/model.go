@@ -82,6 +82,7 @@ func NewModel(root common.Orchestrator, renderer *glamour.TermRenderer) Model {
 		HistoryIndex:        -1,
 		CWD:                 cwd,
 		cachedRendererWidth: -1, // Force first creation
+		Pastes:              make(map[string]string),
 	}
 
 	fp := filepicker.New()
