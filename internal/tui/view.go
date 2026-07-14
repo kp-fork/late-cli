@@ -479,6 +479,11 @@ func (m *Model) updateViewport() {
 		return
 	}
 
+	if m.Mode == ViewRewind {
+		m.renderRewindView()
+		return
+	}
+
 	if m.EscConfirmPending {
 		s := m.GetAgentState(m.Focused.ID())
 		busy := s.State == StateThinking || s.State == StateStreaming || s.State == StateStopping
@@ -1139,6 +1144,86 @@ func (m *Model) renderCommitLogView() {
 		Render(strings.Join(lines, "\n"))
 	m.Viewport.SetContent(paddedContent)
 }
+
+// renderRewindView renders the user message history for rewinding.
+func (m *Model) renderRewindView() {
+	s := m.GetAgentState(m.Focused.ID())
+	s.LastTotalContent = ""
+
+	msgWidth := m.Viewport.Width() - 2
+	if msgWidth < 1 {
+		msgWidth = 80
+	}
+
+	var lines []string
+	header := lipgloss.NewStyle().
+		Foreground(primaryColor).
+		Bold(true).
+		Background(appBgColor).
+		PaddingLeft(1).
+		Render("── Rewind Conversation ──────────────────────────────")
+	lines = append(lines, header, "")
+
+	if len(m.RewindEntries) == 0 {
+		lines = append(lines, lipgloss.NewStyle().
+			Foreground(subtextColor).
+			Background(appBgColor).
+			PaddingLeft(2).
+			Render("No user messages found to rewind to."))
+	} else {
+		for i, entry := range m.RewindEntries {
+			prefix := "  "
+			itemStyle := lipgloss.NewStyle().
+				Foreground(textColor).
+				Background(appBgColor).
+				PaddingLeft(2)
+			msgStyle := lipgloss.NewStyle().
+				Foreground(textColor).
+				Background(appBgColor)
+
+			if i == m.RewindIndex {
+				prefix = "▸ "
+				itemStyle = lipgloss.NewStyle().
+					Foreground(primaryColor).
+					Background(thoughtBgColor).
+					PaddingLeft(2).
+					Bold(true)
+				msgStyle = lipgloss.NewStyle().
+					Foreground(textColor).
+					Background(thoughtBgColor)
+			}
+
+			// Clean/truncate message content for list preview
+			displayMsg := entry.Content
+			// Replace newlines with spaces for single-line display in list
+			displayMsg = strings.ReplaceAll(displayMsg, "\n", " ")
+			if len(displayMsg) > msgWidth-6 {
+				displayMsg = displayMsg[:msgWidth-9] + "..."
+			}
+
+			msgStr := msgStyle.Render(displayMsg)
+			line := prefix + msgStr
+
+			lines = append(lines, itemStyle.Render(line))
+			lines = append(lines, statusBg(""))
+		}
+	}
+
+	// Footer hint
+	footer := lipgloss.NewStyle().
+		Foreground(subtextColor).
+		Background(appBgColor).
+		PaddingLeft(1).
+		Render(fmt.Sprintf("↑↓ navigate · Enter rewind to here · Esc back  (%d messages)", len(m.RewindEntries)))
+	lines = append(lines, "", footer)
+
+	paddedContent := lipgloss.NewStyle().
+		Width(m.Viewport.Width()).
+		Background(appBgColor).
+		Render(strings.Join(lines, "\n"))
+	m.Viewport.SetContent(paddedContent)
+}
+
 
 // overlayCentered places the dialog string centered over the background string,
 // matching the viewport dimensions. The dialog is sized to fit its content.

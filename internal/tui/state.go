@@ -35,6 +35,7 @@ const (
 	ViewSubagent
 	ViewFilePicker
 	ViewCommitLog
+	ViewRewind
 )
 
 // Fixed layout heights (crush-style)
@@ -51,6 +52,7 @@ var AvailableCommands = []string{
 	"/help",
 	"/log",
 	"/quit",
+	"/rewind",
 }
 
 // RenderBlock represents the line bounds of a rendered block in the viewport.
@@ -59,6 +61,12 @@ type RenderBlock struct {
 	Content      string // raw copyable content
 	StartLine    int
 	EndLine      int
+}
+
+// RewindEntry represents a user message that can be rewound to.
+type RewindEntry struct {
+	Index   int
+	Content string
 }
 
 // AppState tracks the interactive state of a single orchestrator.
@@ -153,6 +161,10 @@ type Model struct {
 	CommitEntries []git.CommitEntry
 	CommitIndex   int
 	CommitDetail  string // Full commit detail when viewing a single commit
+
+	// Rewind view
+	RewindEntries []RewindEntry
+	RewindIndex   int
 
 	// Slash-command autocomplete
 	ShowAutocomplete  bool

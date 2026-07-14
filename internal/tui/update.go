@@ -360,6 +360,67 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		focusedState := m.GetAgentState(m.Focused.ID())
 
+		// Rewind view key handling
+		if m.Mode == ViewRewind {
+			switch msg.String() {
+			case "up":
+				m.RewindIndex = max(0, m.RewindIndex-1)
+				m.updateViewport()
+				m.Viewport.SetYOffset(max(0, 2+m.RewindIndex*2-m.Viewport.Height()/2))
+				return m, nil
+			case "down":
+				m.RewindIndex = min(len(m.RewindEntries)-1, m.RewindIndex+1)
+				m.updateViewport()
+				m.Viewport.SetYOffset(max(0, 2+m.RewindIndex*2-m.Viewport.Height()/2))
+				return m, nil
+			case "enter":
+				if m.RewindIndex >= 0 && m.RewindIndex < len(m.RewindEntries) {
+					entry := m.RewindEntries[m.RewindIndex]
+
+					// Place the selected user message into the input box
+					m.Input.Reset()
+					m.Input.SetValue("> " + entry.Content)
+					m.Input.CursorEnd()
+
+					// Remove the selected user message and all subsequent messages from chat history
+					if err := m.Focused.Rewind(entry.Index); err != nil {
+						m.Err = err
+						return m, nil
+					}
+
+					m.Mode = ViewChat
+					m.RewindEntries = nil
+
+					focusedState.RenderedHistory = nil
+					focusedState.CachedHistoryLen = 0
+					focusedState.CachedHistoryTokens = 0
+					focusedState.LastTotalContent = ""
+					focusedState.CumulativeTokenCount = common.CalculateHistoryTokens(
+						m.Focused.History(),
+						m.Focused.SystemPrompt(),
+						m.Focused.ToolDefinitions(),
+					)
+
+					m.ToastMessage = "conversation rewound"
+					m.ToastExpireTime = time.Now().UnixMilli() + 3000
+					clearCmd := tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+						return clearToastMsg{}
+					})
+
+					m.updateViewport()
+					return m, clearCmd
+				}
+				return m, nil
+			case "esc":
+				m.Mode = ViewChat
+				m.RewindEntries = nil
+				focusedState.RenderedHistory = nil
+				m.updateViewport()
+				return m, nil
+			}
+			return m, nil
+		}
+
 		// Commit log view key handling
 		if m.Mode == ViewCommitLog {
 			if m.CommitDetail != "" {
@@ -601,6 +662,38 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 				m.CommitIndex = 0
 				m.CommitDetail = ""
 				m.Mode = ViewCommitLog
+				m.updateViewport()
+				return m, nil
+			}
+			if cmd == "/rewind" {
+				m.Input.Reset()
+				m.Input.SetValue("> ")
+				history := m.Focused.History()
+				var entries []RewindEntry
+				for idx, msg := range history {
+					if msg.Role == "user" {
+						content := msg.Content.UIString()
+						if content == "" {
+							content = msg.Content.String()
+						}
+						entries = append(entries, RewindEntry{
+							Index:   idx,
+							Content: content,
+						})
+					}
+				}
+				if len(entries) == 0 {
+					m.ToastMessage = "no messages to rewind to"
+					m.ToastExpireTime = time.Now().UnixMilli() + 3000
+					clearCmd := tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+						return clearToastMsg{}
+					})
+					m.updateViewport()
+					return m, clearCmd
+				}
+				m.RewindEntries = entries
+				m.RewindIndex = len(entries) - 1 // Default to last user message
+				m.Mode = ViewRewind
 				m.updateViewport()
 				return m, nil
 			}

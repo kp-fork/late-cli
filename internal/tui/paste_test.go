@@ -21,6 +21,7 @@ func (m *mockOrchestrator) Submit(text string, images []string) error {
 }
 func (m *mockOrchestrator) Execute(text string) (string, error) { return "", nil }
 func (m *mockOrchestrator) Reset() error                         { return nil }
+func (m *mockOrchestrator) Rewind(index int) error                { return nil }
 func (m *mockOrchestrator) Cancel()                              {}
 func (m *mockOrchestrator) IsStopRequested() bool                { return false }
 func (m *mockOrchestrator) Events() <-chan common.Event          { return nil }
