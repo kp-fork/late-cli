@@ -89,3 +89,28 @@ func TestPastePlaceholderReplacement(t *testing.T) {
 		t.Errorf("Expected model.Pastes to be empty after submission, got %d items", len(model.Pastes))
 	}
 }
+
+func TestPasteBinaryIgnored(t *testing.T) {
+	orch := &mockOrchestrator{}
+	model := NewModel(orch, nil)
+
+	// Set initial state
+	model.Input.SetValue("> hello")
+	model.lastInputLen = len(model.Input.Value())
+
+	// 1. Simulate PasteMsg of binary content
+	binaryText := "line1\nline2\x00\nline3"
+	msg := tea.PasteMsg{Content: binaryText}
+
+	res, _ := model.Update(msg)
+	model = res.(Model)
+
+	// Verify binary PasteMsg content is not in Pastes map and not inserted into Input
+	if len(model.Pastes) != 0 {
+		t.Errorf("Expected model.Pastes to be empty after binary paste, got %d items", len(model.Pastes))
+	}
+	if strings.Contains(model.Input.Value(), "line1") || strings.Contains(model.Input.Value(), "line2") {
+		t.Errorf("Expected binary paste to be ignored, but input contains pasted content: %q", model.Input.Value())
+	}
+}
+

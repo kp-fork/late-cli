@@ -128,29 +128,33 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 	forwardToInput := true
 
 	if pasteMsg, ok := msg.(tea.PasteMsg); ok {
-		text := pasteMsg.Content
-		lineCount := strings.Count(text, "\n") + 1
-		if lineCount > 3 {
-			placeholder := fmt.Sprintf("[Pasted #%d lines]", lineCount)
-			if m.Pastes == nil {
-				m.Pastes = make(map[string]string)
-			}
-			placeholderWithIndex := placeholder
-			counter := 1
-			for {
-				if _, exists := m.Pastes[placeholderWithIndex]; !exists {
-					break
-				}
-				placeholderWithIndex = fmt.Sprintf("[Pasted #%d lines (%d)]", lineCount, counter)
-				counter++
-			}
-			m.Pastes[placeholderWithIndex] = text
-			m.Input.InsertString(placeholderWithIndex)
-
-			m.ToastMessage = fmt.Sprintf("pasted %d lines (%d chars)", lineCount, len(text))
-			m.ToastExpireTime = time.Now().UnixMilli() + 2500
-
+		if isBinary([]byte(pasteMsg.Content)) {
 			forwardToInput = false
+		} else {
+			text := pasteMsg.Content
+			lineCount := strings.Count(text, "\n") + 1
+			if lineCount > 3 {
+				placeholder := fmt.Sprintf("[Pasted #%d lines]", lineCount)
+				if m.Pastes == nil {
+					m.Pastes = make(map[string]string)
+				}
+				placeholderWithIndex := placeholder
+				counter := 1
+				for {
+					if _, exists := m.Pastes[placeholderWithIndex]; !exists {
+						break
+					}
+					placeholderWithIndex = fmt.Sprintf("[Pasted #%d lines (%d)]", lineCount, counter)
+					counter++
+				}
+				m.Pastes[placeholderWithIndex] = text
+				m.Input.InsertString(placeholderWithIndex)
+
+				m.ToastMessage = fmt.Sprintf("pasted %d lines (%d chars)", lineCount, len(text))
+				m.ToastExpireTime = time.Now().UnixMilli() + 2500
+
+				forwardToInput = false
+			}
 		}
 	}
 
@@ -193,35 +197,41 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 	currentLen := len(m.Input.Value())
 	if currentLen-m.lastInputLen > 50 && m.lastInputLen > 0 {
 		pastedText := m.Input.Value()[m.lastInputLen:]
-		lineCount := strings.Count(pastedText, "\n") + 1
-		charCount := currentLen - m.lastInputLen
-		if lineCount > 3 {
-			placeholder := fmt.Sprintf("[Pasted #%d lines]", lineCount)
-			if m.Pastes == nil {
-				m.Pastes = make(map[string]string)
-			}
-			placeholderWithIndex := placeholder
-			counter := 1
-			for {
-				if _, exists := m.Pastes[placeholderWithIndex]; !exists {
-					break
-				}
-				placeholderWithIndex = fmt.Sprintf("[Pasted #%d lines (%d)]", lineCount, counter)
-				counter++
-			}
-			m.Pastes[placeholderWithIndex] = pastedText
-
-			beforePaste := m.Input.Value()[:m.lastInputLen]
-			m.Input.SetValue(beforePaste + placeholderWithIndex)
+		if isBinary([]byte(pastedText)) {
+			m.Input.SetValue(m.Input.Value()[:m.lastInputLen])
 			m.Input.CursorEnd()
+			currentLen = len(m.Input.Value())
+		} else {
+			lineCount := strings.Count(pastedText, "\n") + 1
+			charCount := currentLen - m.lastInputLen
+			if lineCount > 3 {
+				placeholder := fmt.Sprintf("[Pasted #%d lines]", lineCount)
+				if m.Pastes == nil {
+					m.Pastes = make(map[string]string)
+				}
+				placeholderWithIndex := placeholder
+				counter := 1
+				for {
+					if _, exists := m.Pastes[placeholderWithIndex]; !exists {
+						break
+					}
+					placeholderWithIndex = fmt.Sprintf("[Pasted #%d lines (%d)]", lineCount, counter)
+					counter++
+				}
+				m.Pastes[placeholderWithIndex] = pastedText
 
-			m.ToastMessage = fmt.Sprintf("pasted %d lines (%d chars)", lineCount, charCount)
-			m.ToastExpireTime = time.Now().UnixMilli() + 2500
-			clearCmd := tea.Tick(2500*time.Millisecond, func(t time.Time) tea.Msg {
-				return clearToastMsg{}
-			})
-			m.lastInputLen = len(m.Input.Value())
-			return m, clearCmd
+				beforePaste := m.Input.Value()[:m.lastInputLen]
+				m.Input.SetValue(beforePaste + placeholderWithIndex)
+				m.Input.CursorEnd()
+
+				m.ToastMessage = fmt.Sprintf("pasted %d lines (%d chars)", lineCount, charCount)
+				m.ToastExpireTime = time.Now().UnixMilli() + 2500
+				clearCmd := tea.Tick(2500*time.Millisecond, func(t time.Time) tea.Msg {
+					return clearToastMsg{}
+				})
+				m.lastInputLen = len(m.Input.Value())
+				return m, clearCmd
+			}
 		}
 	}
 	m.lastInputLen = currentLen
@@ -1108,4 +1118,20 @@ func (m Model) interruptFocusedAgent() (Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func isBinary(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	limit := len(data)
+	if limit > 8192 {
+		limit = 8192
+	}
+	for i := 0; i < limit; i++ {
+		if data[i] == 0 {
+			return true
+		}
+	}
+	return false
 }
