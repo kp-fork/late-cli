@@ -7,7 +7,7 @@ This guide gets you productive in Late in under 5 minutes.
 ## Contents
 - [Setup](#setup)
 - [Interface](#interface)
-- [How to Give Good Instructions](#how-to-give-good-instructions)
+- [Giving Good Instructions](#giving-good-instructions)
 - [Tool Approval](#tool-approval)
 - [Configuration](#configuration)
 - [MCP Integration](#mcp-integration)
@@ -76,6 +76,19 @@ Late is a terminal UI with three areas: the **chat viewport** (scrollable histor
 
 > **Tip:** Late supports standard terminal editing like `Alt+Arrows` (word jump), and `Alt+Backspace/Del` (delete word).
 
+### Slash Commands
+
+Type `/` into the input box to bring up a command picker. You can navigate through the available commands with the `Up`/`Down` arrow keys and select one by pressing `Enter`. You do not have to type out the full command.
+
+| Command | Description |
+| --- | --- |
+| `/clear` | Clear current session. |
+| `/rewind` | Open a visual history of your messages to rewind the conversation to an earlier point. |
+| `/compose` | Open your system's default external editor (`$EDITOR`) to draft long or complex instructions. |
+| `/log` | Open the Git commit log viewer. |
+| `/help` | Show default keybindings. |
+| `/quit` | Exit Late. |
+
 ### File Attachments
 
 Press `Ctrl+A` to open the file picker. Navigate with arrow keys, press `Enter` to select a file or enter a folder, `Backspace` to go up, and `Esc` to cancel.
@@ -96,7 +109,7 @@ The status bar at the bottom shows which agent you're currently viewing and its 
 
 > **Tip:** If a subagent seems stuck, switch to it with `Tab` to see what it's doing. You can stop it with `Esc` or `Ctrl+G` without affecting the orchestrator.
 
-## How to Give Good Instructions
+## Giving Good Instructions
 
 Late works best with clear, specific instructions. Some examples:
 
@@ -226,6 +239,7 @@ You can also create an `.llmignore` file alongside your `.gitignore` to specific
 | `--gemma-thinking` | Inject thinking tokens for Gemma 4 models |
 | `--subagent-max-turns <n>` | Set max turns per subagent (default: 500) |
 | `--append-system-prompt "..."` | Append text to the system prompt (e.g. further instructions) |
+| `--enable-images` | Treat models as supporting images (for none llama.cpp servers) |
 
 ## Sessions
 
