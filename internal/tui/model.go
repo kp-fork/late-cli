@@ -81,6 +81,7 @@ func NewModel(root common.Orchestrator, renderer *glamour.TermRenderer) Model {
 		InputHistory:        make([]string, 0),
 		HistoryIndex:        -1,
 		CWD:                 cwd,
+		ShowCWD:             true,
 		cachedRendererWidth: -1, // Force first creation
 		Pastes:              make(map[string]string),
 	}

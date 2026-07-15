@@ -322,7 +322,7 @@ func (m *Model) statusBarView() string {
 	}
 
 	// Append CWD to the left section
-	if m.CWD != "" {
+	if m.ShowCWD && m.CWD != "" {
 		cwdStyle := lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor)
 		display := m.CWD
 		// Truncate long paths

@@ -143,6 +143,7 @@ type Model struct {
 	ModelName    string // Active model name
 	SubagentInfo string // Subagent model/config description, empty if same as main
 	CWD          string // Current working directory, shown in status bar
+	ShowCWD      bool   // Whether to show current working directory in status bar
 
 	// Esc confirmation
 	EscConfirmPending bool   // Show "are you sure?" when Esc pressed at main view

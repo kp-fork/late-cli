@@ -45,6 +45,7 @@ func main() {
 	unsupervisedReq := flag.Bool("i-promise-i-have-backups-and-will-not-file-issues", false, "Unsupported: Execute all tools without supervision. Do not use this, bad things will happen. You have been warned.")
 	enableImagesReq := flag.Bool("enable-images", false, "Force enable support for image attachments for unsupported servers.")
 	continueReq := flag.Bool("continue", false, "Load and start the latest session")
+	showCWDReq := flag.Bool("show-cwd", true, "Show current working directory in status bar")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of late:\n")
@@ -278,6 +279,7 @@ func main() {
 
 	model := tui.NewModel(rootAgent, renderer)
 	model.ModelName = resolvedOpenAIConfig.Model
+	model.ShowCWD = *showCWDReq
 
 	// Detect if subagents use a different model/backend
 	if resolvedSubagentConfig.BaseURL != resolvedOpenAIConfig.BaseURL ||
