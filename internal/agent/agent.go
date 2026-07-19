@@ -52,8 +52,7 @@ func NewSubagentOrchestrator(
 		return nil, fmt.Errorf("unknown agent type: %s", agentType)
 	}
 
-	// 2. Create Session
-	// Subagents should not persist their history to the sessions directory
+	// 2. Setup Subagent Session (Isolated History)
 	sess := session.New(c, "", []client.ChatMessage{}, systemPrompt, true)
 
 	// Inherit all tools from parent (including MCP tools)
@@ -90,7 +89,7 @@ func NewSubagentOrchestrator(
 	}
 
 	// 4. Create Orchestrator
-	id := fmt.Sprintf("subagent-%d", len(parent.Children()))
+	id := fmt.Sprintf("%s-subagent-%d", agentType, len(parent.Children()))
 	mws := parent.Middlewares()
 
 	if messenger != nil {
