@@ -27,29 +27,37 @@ func NewSubagentOrchestrator(
 	messenger tui.Messenger,
 ) (common.Orchestrator, error) {
 	// 1. Determine System Prompt
-	systemPrompt := ""
-	if agentType == "coder" {
-		content, err := assets.PromptsFS.ReadFile("prompts/instruction-coding.md")
-		if err != nil {
-			return nil, fmt.Errorf("failed to load embedded subagent prompt: %w", err)
+	configs := assets.GetSubagents()
+	var config *assets.SubagentConfig
+	for _, c := range configs {
+		if c.Name == agentType {
+			temp := c
+			config = &temp
+			break
 		}
-		systemPrompt = string(content)
+	}
 
-		if injectCWD {
-			cwd, err := os.Getwd()
-			if err == nil {
-				systemPrompt = common.ReplacePlaceholders(systemPrompt, map[string]string{
-					"${{CWD}}": cwd,
-				})
-			}
-		}
-
-		if gemmaThinking {
-			systemPrompt = "<|think|>" + systemPrompt
-		}
-	} else {
-		// TODO: reviewer, committer
+	if config == nil {
 		return nil, fmt.Errorf("unknown agent type: %s", agentType)
+	}
+
+	content, err := assets.PromptsFS.ReadFile(config.PromptFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load embedded subagent prompt: %w", err)
+	}
+	systemPrompt := string(content)
+
+	if injectCWD {
+		cwd, err := os.Getwd()
+		if err == nil {
+			systemPrompt = common.ReplacePlaceholders(systemPrompt, map[string]string{
+				"${{CWD}}": cwd,
+			})
+		}
+	}
+
+	if gemmaThinking {
+		systemPrompt = "<|think|>" + systemPrompt
 	}
 
 	// 2. Setup Subagent Session (Isolated History)
@@ -67,10 +75,14 @@ func NewSubagentOrchestrator(
 		}
 	}
 
-	// Always ensure coder subagents have the full toolset (not just planning tools)
-	if agentType == "coder" {
-		executor.RegisterTools(sess.Registry, enabledTools, false)
+	// Register explicitly allowed tools for the subagent
+	subagentTools := make(map[string]bool)
+	for _, t := range config.AllowedTools {
+		if enabledTools[t] { // only enable if it's also enabled globally
+			subagentTools[t] = true
+		}
 	}
+	executor.RegisterTools(sess.Registry, subagentTools)
 
 	// 3. Construct Initial Context
 	initialMsg := fmt.Sprintf("Goal: %s\n\n", goal)
