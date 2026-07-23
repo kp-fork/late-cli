@@ -117,9 +117,17 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 	// Snapshot state before updateChat processes the key and potentially changes it
 	var stateBefore ValidationState
 	escBefore := false
+	wasAtExactStart := false
+	wasAtExactEnd := false
+	wasAtTopRow := false
+	wasAtBottomRow := false
 	if _, ok := msg.(tea.KeyMsg); ok {
 		stateBefore = m.GetAgentState(m.Focused.ID()).State
 		escBefore = m.EscConfirmPending
+		wasAtExactStart = m.isAtExactInputStart()
+		wasAtExactEnd = m.isAtExactInputEnd()
+		wasAtTopRow = m.isAtTopRow()
+		wasAtBottomRow = m.isAtBottomRow()
 	}
 
 	// Main Chat Update Logic
@@ -153,8 +161,26 @@ func (m Model) updateInternal(msg tea.Msg) (Model, tea.Cmd) {
 			if escBefore || (stateBefore == StateConfirmTool && strings.TrimPrefix(m.Input.Value(), "> ") == "") {
 				forwardToInput = false
 			}
-		case "up", "down":
-			if m.Mode == ViewChat && strings.TrimPrefix(m.Input.Value(), "> ") == "" {
+		case "up":
+			if m.Mode == ViewChat {
+				if m.ShowAutocomplete || wasAtExactStart {
+					forwardToInput = false
+				} else if wasAtTopRow {
+					m.Input.SetCursorColumn(2)
+					forwardToInput = false
+				}
+			} else {
+				forwardToInput = false
+			}
+		case "down":
+			if m.Mode == ViewChat {
+				if m.ShowAutocomplete || wasAtExactEnd {
+					forwardToInput = false
+				} else if wasAtBottomRow {
+					m.Input.CursorEnd()
+					forwardToInput = false
+				}
+			} else {
 				forwardToInput = false
 			}
 		}
@@ -779,12 +805,12 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 
 		case "up":
-			if m.Mode == ViewChat && strings.TrimPrefix(m.Input.Value(), "> ") == "" {
+			if m.Mode == ViewChat && m.isAtExactInputStart() {
 				return m.navigateHistory(-1), nil
 			}
 
 		case "down":
-			if m.Mode == ViewChat && strings.TrimPrefix(m.Input.Value(), "> ") == "" {
+			if m.Mode == ViewChat && m.isAtExactInputEnd() {
 				return m.navigateHistory(1), nil
 			}
 
@@ -1024,6 +1050,45 @@ func (m Model) acceptAutocomplete() Model {
 	m.AutocompleteItems = nil
 	m.AutocompleteIndex = 0
 	return m
+}
+
+func (m Model) isAtExactInputStart() bool {
+	if m.Input.Line() != 0 {
+		return false
+	}
+	info := m.Input.LineInfo()
+	if info.RowOffset != 0 {
+		return false
+	}
+	return m.Input.Column() <= 2
+}
+
+func (m Model) isAtExactInputEnd() bool {
+	if m.Input.Line() != m.Input.LineCount()-1 {
+		return false
+	}
+	info := m.Input.LineInfo()
+	if info.RowOffset != info.Height-1 {
+		return false
+	}
+	lines := strings.Split(m.Input.Value(), "\n")
+	lastLine := lines[len(lines)-1]
+	return m.Input.Column() == utf8.RuneCountInString(lastLine)
+}
+
+func (m Model) isAtTopRow() bool {
+	if m.Input.Line() != 0 {
+		return false
+	}
+	return m.Input.LineInfo().RowOffset == 0
+}
+
+func (m Model) isAtBottomRow() bool {
+	if m.Input.Line() != m.Input.LineCount()-1 {
+		return false
+	}
+	info := m.Input.LineInfo()
+	return info.RowOffset == info.Height-1
 }
 
 // navigateHistory navigates the input history by `dir` steps (+1 forward, -1 backward).
