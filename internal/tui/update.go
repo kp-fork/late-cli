@@ -641,7 +641,7 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 				m.updateLayout()
 				return m, nil
 			}
-			if cmd == "/clear" {
+			if cmd == "/new" {
 				m.Input.Reset()
 				m.Input.SetValue("> ")
 				m.Focused.Reset()
@@ -1018,9 +1018,9 @@ func (m *Model) updateAutocomplete() {
 	// Only show autocomplete when input starts with "/" and has no space yet
 	if strings.HasPrefix(input, "/") && !strings.Contains(input, " ") {
 		prefix := strings.ToLower(input)
-		var matches []string
+		var matches []CommandDef
 		for _, cmd := range AvailableCommands {
-			if strings.HasPrefix(strings.ToLower(cmd), prefix) {
+			if strings.HasPrefix(strings.ToLower(cmd.Name), prefix) {
 				matches = append(matches, cmd)
 			}
 		}
@@ -1042,7 +1042,7 @@ func (m *Model) updateAutocomplete() {
 // acceptAutocomplete replaces the current input with the selected command.
 func (m Model) acceptAutocomplete() Model {
 	if m.AutocompleteIndex >= 0 && m.AutocompleteIndex < len(m.AutocompleteItems) {
-		selected := m.AutocompleteItems[m.AutocompleteIndex]
+		selected := m.AutocompleteItems[m.AutocompleteIndex].Name
 		m.Input.SetValue("> " + selected + " ")
 		m.Input.CursorEnd()
 	}
